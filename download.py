@@ -62,10 +62,11 @@ def configure_browser(options):
     opts = webdriver.ChromeOptions()
     
     # Chrome user agent will download files for us
-    #opts.add_argument("user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/53.0.2785.116 Safari/537.36")
+    opts.add_argument("user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/53.0.2785.116 Safari/537.36")
     
     # This user agent will give us files w. download info
-    opts.add_argument("user-agent=Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; AS; rv:11.0) like Gecko")
+    # Comment by d10r: For me this user agent didn't download at all, but forward to a page telling me to use Audible Downloader
+    #opts.add_argument("user-agent=Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; AS; rv:11.0) like Gecko")
     chromePrefs = {
         "profile.default_content_settings.popups":"0", 
         "download.default_directory":options.dw_dir}
@@ -254,17 +255,28 @@ def download_files_on_page(driver, page, maxpage, debug):
                         #print("Download-title (%s): %s" % (c, download_a.get_attribute("title").strip()))
                             logging.info("Clicking download link for %s" % (title))
                             download_a.click()
-                            logging.info("Waiting for Chrome to complete download of datafile")
                             time.sleep(1)
-                            datafile = "%s%s" % (options.dw_dir, "admhelper")
-                            wait_for_download_or_die(datafile)
                             
-                            logging.info("Datafile downloaded")
+                            if False:
+                                # This is disabled because it doesn't work for me (on audible.de)
+                                # The script seems to expect the filename to be "admhelper" which isn't the case (anymore?).
+                                # Instead the filename is specific to the audiobook and my account.
+                                datafile = "%s%s" % (options.dw_dir, "admhelper")
+                                wait_for_download_or_die(datafile) 
+                                logging.info("Datafile downloaded")
+                                download_file(datafile, title, books_downloaded, page, maxpage)
+                                wait_for_file_delete(datafile)
+                                time.sleep(1)
+                            else:
+                                # My quick workaround here is to just wait a minute before triggering the next download.
+                                # Not sure what download_file() is supposed to do and what's missing if it's not done. I don't need it to get the file.
+                                # TODO: Fix this (at least add a check to make sure the download actually succeeded)
+                                logging.info("You need to manually check if the download actually started. Waiting for 60 seconds...")
+                                # This is too long for some and too short for other audiobooks. TODO: make smarter
+                                time.sleep(60)
+                                logging.info("*** Starting next download.")
         
                             books_downloaded = books_downloaded + 1
-                            download_file(datafile, title, books_downloaded, page, maxpage)
-                            wait_for_file_delete(datafile)
-                            time.sleep(1)
                 else:
                     books_downloaded = books_downloaded + 1
                     logging.info("Debug, no download")
@@ -307,12 +319,12 @@ def configure_audible_library(driver, lang):
         sys.exit(1)
 
     # Comment out this in hope of not hitting download limit as fast
-    if not ('adbl-sort-down' in driver.find_element_by_id("SortByLength").get_attribute("class")):
-        logging.info("Sorting downloads by shortest to longest")
-        driver.find_element_by_id("SortByLength").click()
-        time.sleep(10)
-    else:
-        logging.info("Downloads were already sorted by shortest to longest, continuing")
+#    if not ('adbl-sort-down' in driver.find_element_by_id("SortByLength").get_attribute("class")):
+#        logging.info("Sorting downloads by shortest to longest")
+#        driver.find_element_by_id("SortByLength").click()
+#        time.sleep(10)
+#    else:
+#        logging.info("Downloads were already sorted by shortest to longest, continuing")
 
 def loop_pages(logging, driver):
     maxpage = 0
